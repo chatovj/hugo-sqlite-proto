@@ -1,3 +1,6 @@
 <footer>
   <p class="meta">Generado con Hugo · índice con SQLite en build · sin base de datos en producción</p>
+  {{ with site.Data.words }}
+  <p>Total de palabras de todos los artículos: {{ .total }}</p>
+  {{ end }}
 </footer>

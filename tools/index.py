@@ -18,6 +18,7 @@ listas en línea `tags: [a, b]`. Nada de TOML (+++) ni listas multilínea.
 Docs: https://docs.python.org/3/library/sqlite3.html
       https://www.sqlite.org/json1.html
 """
+import argparse
 import json
 import re
 import sqlite3
@@ -43,6 +44,10 @@ CREATE TABLE tags (
   tag TEXT NOT NULL,
   PRIMARY KEY (url, tag)
 );
+CREATE TABLE words (
+  url TEXT PRIMARY KEY REFERENCES posts(url),
+  n INTEGER NOT NULL
+);
 """
 
 # SQL produce directamente el JSON (extensión json1 de SQLite).
@@ -65,7 +70,11 @@ FROM (
   SELECT tag, COUNT(*) AS total FROM tags GROUP BY tag ORDER BY total DESC, tag
 )
 """
-
+# Total de palabras de todos los artículos.
+Q_WORDS = """
+SELECT json_object('total', COALESCE(SUM(n), 0))
+FROM words
+"""
 # --- funciones puras ---------------------------------------------------------
 
 def split_front_matter(text):
@@ -132,9 +141,12 @@ def read_page(path):
     }
 
 
-def read_all():
+def read_all(include_drafts=False):
     files = (p for p in sorted(CONTENT.rglob("*.md")) if p.name != "_index.md")
-    return [page for page in map(read_page, files) if not page["draft"]]
+    pages = list(map(read_page, files))
+    if include_drafts:
+        return pages
+    return [page for page in pages if not page["draft"]]
 
 
 # --- efectos: disco y SQL ----------------------------------------------------
@@ -150,6 +162,9 @@ def build_db(pages):
     con.executemany(
         "INSERT OR IGNORE INTO tags(url, tag) VALUES (?, ?)",
         [(p["url"], t) for p in pages for t in p["tags"]])
+    con.executemany(
+        "INSERT INTO words(url, n) VALUES (?, ?)",
+        [(p["url"], len(p["text"].split())) for p in pages])
     con.commit()
     return con
 
@@ -160,12 +175,22 @@ def export(con, query, out):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Indexar publicaciones Markdown")
+    parser.add_argument(
+        "--drafts",
+        action="store_true",
+        help="Incluir también los borradores"
+    )
+    args = parser.parse_args()
+
     if not CONTENT.is_dir():
         sys.exit("index.py: ejecútalo desde la raíz del repo (make index)")
-    pages = read_all()
+
+    pages = read_all(include_drafts=args.drafts)
     con = build_db(pages)
     export(con, Q_SEARCH, OUT_SEARCH)
     export(con, Q_TAGS, OUT_TAGS)
+    export(con, Q_WORDS, Path("data/words.json"))
     con.close()
     print(f"index: {len(pages)} páginas → {OUT_SEARCH}, {OUT_TAGS}")
 
