@@ -22,7 +22,20 @@ const matches = ts => post => ts.every(t => haystack(post).includes(t));
 
 const search = (posts, query) => {
   const ts = terms(query);
-  return ts.length ? posts.filter(matches(ts)) : [];
+
+  if (!ts.length) return [];
+
+  const countMatches = post =>
+    ts.reduce((total, term) => {
+      const text = haystack(post);
+      return total + (text.split(term).length - 1);
+    }, 0);
+
+  return posts
+    .filter(matches(ts))
+    .map(post => ({ post, score: countMatches(post) }))
+    .sort((a, b) => b.score - a.score)
+    .map(result => result.post);
 };
 
 // --- efectos (DOM) ----------------------------------------------------------
