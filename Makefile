@@ -1,6 +1,6 @@
 # Hugo + SQLite (solo en build). Cada objetivo hace una cosa.
 .DEFAULT_GOAL := help
-.PHONY: index build serve check clean check-invites help
+.PHONY: index build serve check clean check-invites test migrar help
 
 index:   ## Markdown → SQLite → static/search.json + data/tags.json
 	python3 tools/index.py
@@ -26,3 +26,10 @@ check-invites:   ## [profesor] Lista invitaciones de colaborador pendientes (gh 
 help:   ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+
+test:   ## Ejecuta las pruebas automáticas de la migración
+	python3 -m unittest discover -s tools -v
+
+migrar:   ## Migra Hugo a Chyrp (DESTINO=/ruta/blog.sqlite, SIMULACRO=1 opcional)
+	@test -n "$(DESTINO)" || (echo "Uso: make migrar DESTINO=/ruta/blog.sqlite [SIMULACRO=1]"; exit 1)
+	python3 tools/migrar.py --destino "$(DESTINO)" $(if $(SIMULACRO),--simulacro,)

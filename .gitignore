@@ -7,3 +7,7 @@ resources/
 build/
 static/search.json
 data/tags.json
+
+# Python
+__pycache__/
+*.py[cod]
